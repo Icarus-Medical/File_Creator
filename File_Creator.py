@@ -154,6 +154,9 @@ for i in range(lowerBoundId,upperBoundId+1):
         exe = False
 
     if orderStatus == "Open" and exe:
-        file_exe(i, request)
+        try:
+            file_exe(i, request)
+        except:
+            app.log("File creation failed for order #" + str(i))
 
 
