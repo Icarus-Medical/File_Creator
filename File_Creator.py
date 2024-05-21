@@ -16,14 +16,15 @@ def getOrder(orderId):
         response = api.get(f"/api/order/{orderId}")
         data = response.data
 
-        patientName = data["patientName"]
-        model       = data["catalog"] #same setup as leg["name"]
-        step        = data["lastJobEvent"] #if None traveler has not been started 
-        engraving   = data["engraving"]
-        leg         = data["leg"]
-        product     = data["product"]
-        location    = data["location"]
-        status      = data["travelerStatus"] #'NEW' 'VERIFIED' or 'ARCHIVED'
+        patientName    = data["patientName"]
+        model          = data["catalog"] #same setup as leg["name"]
+        step           = data["lastJobEvent"] #if None traveler has not been started 
+        engraving      = data["engraving"]
+        leg            = data["leg"]
+        product        = data["product"]
+        location       = data["location"]
+        travelerStatus = data["travelerStatus"] #'NEW' 'VERIFIED' or 'ARCHIVED'
+        status         = data["status"] #open or pending
 
         return {
             "patientName"           : patientName,
@@ -36,7 +37,8 @@ def getOrder(orderId):
             "bilateral"             : False,
             "catalog"               : model["name"] if model is not None else "",
             "lastJobEvent"          : step,
-            "travelerStatus"        : status
+            "travelerStatus"        : travelerStatus,
+            "status"                : status["name"] if status is not None else ""
         }
     except:
         return {
@@ -66,8 +68,9 @@ def file_copy(fileName, orientation, a3):
         elif folder.name == "KAFO":
             kafoFolder = folder
 
+
     #Grabbing starter files by unique ID. You could also loop through the files and find by name, dont think it matters
-    leftStarter = starterFileFolder.dataFiles.itemById("urn:adsk.wipprod:dm.lineage:Axlch_JzSh2eXQugDw6s")
+    leftStarter = starterFileFolder.dataFiles.itemById("urn:adsk.wipprod:dm.lineage:Axlch_JzSh2eXQugDw6sEg")    
     rightStarter = starterFileFolder.dataFiles.itemById("urn:adsk.wipprod:dm.lineage:QZ7I-dyIQ4ayWBotc3zdjw")
     a3Starter = starterFileFolder.dataFiles.itemById("urn:adsk.wipprod:dm.lineage:YxVWVPAgS-OMBbrvofjM4g")
 
@@ -94,49 +97,63 @@ def file_copy(fileName, orientation, a3):
     newFile.name = fileName 
 
 
-def file_exe(orderId):
+def file_exe(orderId, request):
     #the actual execution file, takes in order ID, grabs the traveler data
     #uses it to create the fileName string. That is then fed into the fileCopy function
     
     #Pulling relevant patient variables from the getOrder function
-    request     = getOrder(orderId)
-    orientation = request["leg"].lower()
-    patientName = request["patientName"]
-    model       = request["catalog"] #this tells me if its Ascender, KAFO or A3.0
-    step        = request["lastJobEvent"] #if None, traveler is not started
-    status      = request["travelerStatus"]
+    orientation    = request["leg"].lower()
+    patientName    = request["patientName"]
+    model          = request["catalog"] #this tells me if its Ascender, KAFO or A3.0
+    step           = request["lastJobEvent"] #if None, traveler is not started
+    travelerStatus = request["travelerStatus"]
 
+    if model == 'Ascender - Custom' or model == 'Ascender 3 - Custom':
     #split patientName into first and last
-    nameList = patientName.split()
-    firstName = nameList[0]
-    lastName = nameList[1]
+        nameList = patientName.split()
+        firstName = nameList[0]
+        try:
+            lastName = nameList[1]
+        except:
+            lastName = ' '
 
-    #Checking if the model is an ascender 3. If '3' is present as the 2nd word
-    if model.split()[1] == "3":
-        a3 = True
-    else:
-        a3 = False
-    #Pairing orientation with our shorthand naming convention
-    if orientation == 'left':
-        legName = 'L'
-    else:
-        legName = "R"
-    idName = str(orderId)
+        #Checking if the model is an ascender 3. If '3' is present as the 2nd word
+        if model.split()[1] == "3":
+            a3 = True
+        else:
+            a3 = False
+        #Pairing orientation with our shorthand naming convention
+        if orientation == 'left':
+            legName = 'L'
+        else:
+            legName = "R"
+        idName = str(orderId)
 
-    #Creating one string with our file naming convention, this is fed into the file_copy function
-    fileName = idName + "_" + lastName + "_" + firstName + "_" + legName
+        #Creating one string with our file naming convention, this is fed into the file_copy function
+        fileName = idName + "_" + lastName + "_" + firstName + "_" + legName
 
-    #Check if traveler is Not Started and  not archived, execute file_copy
-    if step is None and status != "ARCHIVED":
-        file_copy(fileName, orientation, a3)
+        #Check if traveler is Not Started and  not archived, execute file_copy
+        if step is None and travelerStatus != "ARCHIVED":
+            #app.log(str(orderId))
+            file_copy(fileName, orientation, a3)
 
 #i need to grab these automatically. Check if traveler is not started and if it is not archived, then create
 
 #Setting a range of order Ids to iterate through and create files for
 #This needs to be manually updated by the user (need to change this)
-upperBoundId = 13440
-lowerBoundId = 13425
+upperBoundId = 13473
+lowerBoundId = 13455
 for i in range(lowerBoundId,upperBoundId+1):
-    file_exe(i)
+    request = getOrder(i)
+
+    #Checking to make sure order is open and not pending
+    try:
+        orderStatus = request["status"]
+        exe = True
+    except:
+        exe = False
+
+    if orderStatus == "Open" and exe:
+        file_exe(i, request)
 
 
