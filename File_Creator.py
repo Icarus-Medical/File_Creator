@@ -42,13 +42,76 @@ def getOrder(data):
     except:
         return None
 
-def file_copy(fileName, orientation, a3):
+
+def parseStl(meshData):
+    meshName = ""
+    coordinates = []
+    normalVectors = []
+
+    # Decode the data and split into individual lines
+    bytes = bytearray(meshData)
+    lines = bytes.splitlines()
+
+    # Iterate over lines
+    for i, lineBytes in enumerate(lines):
+
+        # Split the line by spaces
+        line = lineBytes.decode().strip().split(" ")
+
+        # First line of file has format "solid <mesh name>"
+        if i == 0:
+            if line[0] != "solid":
+                raise Exception("First line of the .stl must start with 'solid'")
+            meshName = line[1]
+
+        # Last line of file has format "endsolid <mesh name>"
+        elif i == len(lines) - 1:
+            if line[0] != "endsolid":
+                raise Exception("Last line of the .stl must start with 'endsolid'")
+            if line[1] != meshName:
+                raise Exception("Last line of the .stl must end with the mesh name")
+
+        # First line in group of 7 has format "facet normal <x> <y> <z>"
+        elif (i - 1) % 7 == 0:
+            if line[0] != "facet" or line[1] != "normal":
+                raise Exception(f"Line {i} of the .stl must begin with 'facet normal'")
+            normalVectors.append(float(line[2]))
+            normalVectors.append(float(line[3]))
+            normalVectors.append(float(line[4]))
+
+        # Second line in group of 7 is "outer loop"
+        elif (i - 2) % 7 == 0:
+            if line[0] != "outer" or line[1] != "loop":
+                raise Exception(f"Line {i} of the .stl must be 'outer loop'")
+
+        # Third, fourth, and fifth lines in group of 7 have format "vertex <x> <y> <z>"
+        elif (i - 3) % 7 == 0 or (i - 4) % 7 == 0 or (i - 5) % 7 == 0:
+            if line[0] != "vertex":
+                raise Exception(f"Line {i} of the .stl must begin with 'vertex'")
+            coordinates.append(float(line[1]))
+            coordinates.append(float(line[2]))
+            coordinates.append(float(line[3]))
+
+        # Sixth line in group of 7 is "endloop"
+        elif (i - 6) % 7 == 0:
+            if line[0] != "endloop":
+                raise Exception(f"Line {i} of the .stl must be 'endloop'")
+
+        # Seventh line in group of 7 is "endfacet"
+        elif (i - 7) % 7 == 0:
+            if line[0] != "endfacet":
+                raise Exception(f"Line {i} of the .stl must be 'endfacet'")
+
+        # Should never hit this case
+        else:
+            raise Exception(f"Parsing failed for .stl on line {i}")
+
+    return meshName, coordinates, normalVectors
+
+def file_copy(fileName, order, coordinates, normalVectors):
     #This function grabs the proper starter file and creates a copy into the production folder 
-    #file name is fed as an input and orientation as well to pick the right starter file
-    #a3 is a boolean that says if this is an Ascneder 3.0 
 
     productionFolder = app.data.findFolderById('urn:adsk.wipprod:fs.folder:co.EgnkouHiTqeVUlInebHVzg') #Grabbing production folder by unique folder ID
-
     #searching through production subFolders by name to grab relevant folders
     for folder in productionFolder.dataFolders:
         if folder.name == '2024 Patient Files':
@@ -58,11 +121,23 @@ def file_copy(fileName, orientation, a3):
         elif folder.name == "KAFO":
             kafoFolder = folder
 
-
     #Grabbing starter files by unique ID. You could also loop through the files and find by name, dont think it matters
     leftStarter = starterFileFolder.dataFiles.itemById("urn:adsk.wipprod:dm.lineage:Axlch_JzSh2eXQugDw6sEg")    
     rightStarter = starterFileFolder.dataFiles.itemById("urn:adsk.wipprod:dm.lineage:QZ7I-dyIQ4ayWBotc3zdjw")
     a3Starter = starterFileFolder.dataFiles.itemById("urn:adsk.wipprod:dm.lineage:YxVWVPAgS-OMBbrvofjM4g")
+
+    #Pulling relevant patient variables from the getOrder function
+    orientation    = order["leg"].lower()
+    model          = order["catalog"] #this tells me if its Ascender, KAFO or A3.0
+    step           = order["lastJobEvent"] #if None, traveler is not started
+    travelerStatus = order["travelerStatus"]
+
+    if model == 'Ascender - Custom' or model == 'Ascender 3 - Custom':
+        #Checking if the model is an ascender 3. If '3' is present as the 2nd word
+        if model.split()[1] == "3":
+            a3 = True
+        else:
+            a3 = False
 
     #Deciding which starter file will be used based on order id input
     if a3:
@@ -82,32 +157,17 @@ def file_copy(fileName, orientation, a3):
         if month.name == currentMonth:
             targetFolder = month
 
+    targetFolder = kafoFolder #temporary for testing
+
+    #setting fileName to our format
+    fileNameChopped = fileName.split('_')
+    fileNameFormatted = fileNameChopped[0] + '_' + fileNameChopped[1] + '_' + fileNameChopped[2] + '_' + fileNameChopped[3]
+
     #This is the actual command that copies the selected doc into the current month folder
-    newFile = activeDoc.copy(targetFolder)
-    newFile.name = fileName 
-
-
-def file_exe(fileName, data, mesh):
-    #the actual execution file, takes in order ID, grabs the traveler data
-    #uses it to create the fileName string. That is then fed into the fileCopy function
-    
-    #Pulling relevant patient variables from the getOrder function
-    orientation    = data["leg"].lower()
-    model          = data["catalog"] #this tells me if its Ascender, KAFO or A3.0
-    step           = data["lastJobEvent"] #if None, traveler is not started
-    travelerStatus = data["travelerStatus"]
-
-    if model == 'Ascender - Custom' or model == 'Ascender 3 - Custom':
-        #Checking if the model is an ascender 3. If '3' is present as the 2nd word
-        if model.split()[1] == "3":
-            a3 = True
-        else:
-            a3 = False
-
-        #Check if traveler is Not Started and  not archived, execute file_copy
-        if step is None and travelerStatus != "ARCHIVED":
-            #app.log(str(orderId))
-            file_copy(fileName, orientation, a3)    
+    if travelerStatus != "ARCHIVED":
+        newFile = activeDoc.copy(targetFolder)
+        newFile.name = fileNameFormatted
+    return newFile
 
 def importFiles():
     # Get a list of all builder files ready for import
@@ -145,18 +205,74 @@ def importFiles():
             continue
 
         fileName = data["name"]
-        mesh = data["mesh"]
+        meshData = data["mesh"]["data"]
+        meshName, coordinates, normalVectors = parseStl(meshData)
+        wireframe = data["wireframe"]
+
+
+
+        # x = leftHingePos[0]
+        # y = leftHingePos[1]
+        # z = leftHingePos[2]
 
         # Create a new Fusion file
         try:
             # Check to make sure order is open
             if order["status"] == "Open":
-                file_exe(fileName, order, mesh)
+                docData = file_copy(fileName, order, coordinates, normalVectors)
+                
 
                 # File creation was successful. Remove from the list of builder files
-                app.log(f"Import successful. Removing data for file {fileLabel}")
-                api.post(f"/api/fusionFile/{file['id']}/delete", {})
+                #app.log(f"Import successful. Removing data for file {fileLabel}")
+                #api.post(f"/api/fusionFile/{file['id']}/delete", {})
         except:
             app.log(f"Import failed for file {fileLabel}")
+        
+        pointCreator(docData, wireframe, coordinates, normalVectors)
+
+    # product = app.activeProduct
+    # root = adsk.fusion.Design.cast(product).rootComponent
+
+
+def pointCreator(docData, wireframe, coordinates, normalVectors):
+        doc = app.documents.open(docData, False)
+        des: adsk.fusion.Design = doc.products.itemByProductType('DesignProductType')
+        root = des.rootComponent
+
+        nodes = []
+        leftHingePos = wireframe["leftHingePos"]
+        rightHingePos = wireframe['rightHingePos']
+        botCuffPos = wireframe["botCuffPos"]
+        botLeftCuffPos = wireframe['botLeftCuffPos']
+        botLeftFramePos = wireframe['botLeftFramePos']
+        botLeftPos = wireframe['botLeftPos']
+        botRightCuffPos = wireframe['botRightCuffPos']
+        botRightFramePos = wireframe['botRightFamePos']
+        botRightPos = wireframe['botRightPos']
+        topCuffPos = wireframe['topCuffPos']
+        topLeftCuffPos = wireframe['topLeftCuffPos']
+        topLeftFramePos = wireframe["topLeftFramePos"]
+        topLeftPos = wireframe['topLeftPos']
+        topRightCuffPos = wireframe["topRightCuffPos"]
+        topRightFramePos = wireframe['topRightFramePos']
+        topRightPos = wireframe['topRightPos']
+        nodes.extend((topRightPos, topRightFramePos, topRightCuffPos, topLeftPos,topLeftFramePos,topLeftCuffPos,topCuffPos,botRightPos,
+                     botRightFramePos,botRightCuffPos,botLeftPos,botLeftFramePos,botLeftCuffPos,botCuffPos,rightHingePos,leftHingePos))
+    
+
+        # Create a sketch with a single circle.
+        sk: adsk.fusion.Sketch = root.sketches.add(root.xYConstructionPlane)
+
+        
+        for node in nodes:
+            pt = adsk.core.Point3D.create(node[0]/10,(node[2]/10) + 8.38,node[1]/10)
+            sk.sketchPoints.add(pt)
+
+        # meshBodies = root.meshBodies
+        # leg = meshBodies.addByTriangleMeshData(coordinates, [], normalVectors, [])
             
+
+
+
+
 importFiles()
