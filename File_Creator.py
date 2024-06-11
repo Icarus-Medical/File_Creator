@@ -210,11 +210,6 @@ def importFiles():
         wireframe = data["wireframe"]
 
 
-
-        # x = leftHingePos[0]
-        # y = leftHingePos[1]
-        # z = leftHingePos[2]
-
         # Create a new Fusion file
         try:
             # Check to make sure order is open
@@ -228,45 +223,189 @@ def importFiles():
         except:
             app.log(f"Import failed for file {fileLabel}")
         
-        pointCreator(docData, wireframe, coordinates, normalVectors)
+        fitFrame(docData, wireframe)
 
     # product = app.activeProduct
     # root = adsk.fusion.Design.cast(product).rootComponent
+def pointCreator(wireframe):
+        nodes = []
+        #I'm naming these based on the cross sections they match up with. fitPt1 = CS-1 etc
+        fitPt1 = wireframe["leftHingePos"]
+        fitPt13 = wireframe['rightHingePos']
+        fitPt19 = wireframe["botCuffPos"]
+        fitPt20 = wireframe['botLeftCuffPos']
+        fitPt22 = wireframe['botLeftFramePos']
+        fitPt21 = wireframe['botLeftPos']
+        fitPt18 = wireframe['botRightCuffPos']
+        fitPt16 = wireframe['botRightFamePos']
+        fitPt17 = wireframe['botRightPos']
+        fitPt7 = wireframe['topCuffPos']
+        fitPt6 = wireframe['topLeftCuffPos']
+        fitPt4 = wireframe["topLeftFramePos"]
+        fitPt5 = wireframe['topLeftPos']
+        fitPt8 = wireframe["topRightCuffPos"]
+        fitPt10 = wireframe['topRightFramePos']
+        fitPt9 = wireframe['topRightPos']
+        nodes.extend((fitPt1,fitPt1,fitPt1,fitPt4,fitPt5,fitPt6,fitPt7,fitPt8,fitPt9,fitPt10,fitPt13,fitPt13,fitPt13,fitPt13,fitPt13,fitPt16,fitPt17,fitPt18,fitPt19,fitPt20,fitPt21,fitPt22, fitPt1, fitPt1))
 
+        return nodes
 
-def pointCreator(docData, wireframe, coordinates, normalVectors):
+def ip_mover(i,transform, bip=False):
+    app = adsk.core.Application.get()
+    ui = app.userInterface
+    design = app.activeProduct
+    root = design.rootComponent
+#function to move all IPs and BIPs with their CSs
+
+    skList = []
+    if bip:
+        skList.append(root.sketches.itemByName('BIP-' + str(i)))
+    else:
+        skList.append(root.sketches.itemByName('IP-' + str(i)))
+    
+    if i == 5:
+        skList.append(root.sketches.itemByName('IP-4.5'))
+        skList.append(root.sketches.itemByName('IP-5.5'))
+
+    for sk in skList:
+        group = adsk.core.ObjectCollection.create()
+        #add all sketch components to group
+        for crv in sk.sketchCurves:
+            group.add(crv)
+        for pnt in sk.sketchPoints:
+            group.add(pnt)
+
+        sk.move(group, transform) 
+
+    if not bip:
+        railSk = root.sketches.itemByName('Pipe-rail-1')
+        railGrp = adsk.core.ObjectCollection.create()
+        if 1 <= i <= 4:
+            railPt = railSk.sketchCurves.sketchFittedSplines.item(0).fitPoints.item(i-1)
+        elif i == 5:
+            railPt = railSk.sketchCurves.sketchFittedSplines.item(0).fitPoints.item(i-1)
+            railPt2 = railSk.sketchCurves.sketchFittedSplines.item(0).fitPoints.item(i)
+            railPt3 = railSk.sketchCurves.sketchFittedSplines.item(0).fitPoints.item(i+1)
+            railGrp.add(railPt2)
+            railGrp.add(railPt3)
+        else:
+            railPt = railSk.sketchCurves.sketchFittedSplines.item(0).fitPoints.item(i+1)
+        railGrp.add(railPt)
+
+        railSk.move(railGrp, transform)
+    
+def spline_mover(i, transform):
+    app = adsk.core.Application.get()
+    ui = app.userInterface
+    design = app.activeProduct
+    root = design.rootComponent
+    splineList = ['rail-1', 'rail-2', 'rail-3', 'rail-4', 'rail-5']
+
+    for spline in splineList:
+        #function to move a specific spline point i, from the spline inputted
+        sk = root.sketches.itemByName(spline)
+
+        group = adsk.core.ObjectCollection.create()
+        #add all sketch components to group
+        spoint = sk.sketchCurves.sketchFittedSplines.item(0).fitPoints.item(i)
+        group.add(spoint)
+
+        sk.move(group, transform)
+
+def hinge_mover(transform, medial=False):
+    app = adsk.core.Application.get()
+    ui = app.userInterface
+    design = app.activeProduct
+    root = design.rootComponent
+    if medial:
+        occ = root.occurrences.itemByName('MedialHinge:1')
+    else:
+        occ = root.occurrences.itemByName('LateralHinge:1')
+    features = occ.component.features
+    moveFeats = features.moveFeatures
+
+    bodies = adsk.core.ObjectCollection.create()
+    for body in occ.component.bRepBodies:
+        bodies.add(body)
+
+    moveFeatureInput = moveFeats.createInput(bodies, transform)
+    moveFeats.add(moveFeatureInput)   
+
+def csMover(i, fitPt):
+    app = adsk.core.Application.get()
+    ui = app.userInterface
+    design = app.activeProduct
+    root = design.rootComponent
+
+    #add cross section curve and points to group and move together
+    group = adsk.core.ObjectCollection.create()
+    #Grab sketch based on i
+    cs = root.sketches.itemByName('CS-'+ str(i))
+    #add all sketch components to group
+    for crv in cs.sketchCurves:
+        group.add(crv)
+    for pnt in cs.sketchPoints:
+        group.add(pnt)
+
+    #find inside point on CS as our fromPt
+    csPt = cs.sketchCurves.sketchFittedSplines.item(0).fitPoints.item(1).worldGeometry
+
+    #grab corresponding fitPt from list of nodes
+
+    rawTransform = adsk.core.Matrix3D.create()
+    rawTransform.translation = csPt.vectorTo(fitPt)
+
+    dX = rawTransform.translation.x
+    dY = rawTransform.translation.y
+    dZ = rawTransform.translation.z
+
+    #specific translation modifiers for cs's
+    transform = adsk.core.Matrix3D.create()
+
+    if 1<=i<=3 or 23<=i<=24:
+        a = 0.92
+    elif 11<=i<=15:
+        a = -0.92
+    else:
+        a = 0
+
+    #isolating cuff cross sections to move in X and Y directions
+    if 6 <= i <= 8 or 18 <= i <= 20:                                                                                  #BCuff corners flare out
+        transform.translation = adsk.core.Vector3D.create(dX, dY, 0)
+    else:
+        transform.translation = adsk.core.Vector3D.create(dX+a, 0, 0)
+
+    if i == 1:
+        hinge_mover(transform, False)
+    elif i == 13:
+        hinge_mover(transform, True)
+        
+    cs.move(group, transform)
+    spline_mover(i-1, transform)
+    if 1 <= i <= 13:
+        ip_mover(i, transform)
+    elif i == 14 or i == 24:
+        ip_mover(i, transform, True)
+
+    
+
+def fitFrame(docData, wireframe):
         doc = app.documents.open(docData, False)
         des: adsk.fusion.Design = doc.products.itemByProductType('DesignProductType')
         root = des.rootComponent
 
-        nodes = []
-        leftHingePos = wireframe["leftHingePos"]
-        rightHingePos = wireframe['rightHingePos']
-        botCuffPos = wireframe["botCuffPos"]
-        botLeftCuffPos = wireframe['botLeftCuffPos']
-        botLeftFramePos = wireframe['botLeftFramePos']
-        botLeftPos = wireframe['botLeftPos']
-        botRightCuffPos = wireframe['botRightCuffPos']
-        botRightFramePos = wireframe['botRightFamePos']
-        botRightPos = wireframe['botRightPos']
-        topCuffPos = wireframe['topCuffPos']
-        topLeftCuffPos = wireframe['topLeftCuffPos']
-        topLeftFramePos = wireframe["topLeftFramePos"]
-        topLeftPos = wireframe['topLeftPos']
-        topRightCuffPos = wireframe["topRightCuffPos"]
-        topRightFramePos = wireframe['topRightFramePos']
-        topRightPos = wireframe['topRightPos']
-        nodes.extend((topRightPos, topRightFramePos, topRightCuffPos, topLeftPos,topLeftFramePos,topLeftCuffPos,topCuffPos,botRightPos,
-                     botRightFramePos,botRightCuffPos,botLeftPos,botLeftFramePos,botLeftCuffPos,botCuffPos,rightHingePos,leftHingePos))
-    
+        nodes = pointCreator(wireframe)
 
-        # Create a sketch with a single circle.
-        sk: adsk.fusion.Sketch = root.sketches.add(root.xYConstructionPlane)
+        sk = root.sketches.add(root.xYConstructionPlane)
 
-        
+        fitPts = []
         for node in nodes:
             pt = adsk.core.Point3D.create(node[0]/10,(node[2]/10) + 8.38,node[1]/10)
             sk.sketchPoints.add(pt)
+            fitPts.append(pt)
+
+        for i in range(1, 25):
+            csMover(i, fitPts[i-1])
 
         # meshBodies = root.meshBodies
         # leg = meshBodies.addByTriangleMeshData(coordinates, [], normalVectors, [])
