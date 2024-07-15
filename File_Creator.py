@@ -159,7 +159,7 @@ def file_copy(fileName, order, coordinates, normalVectors):
         if month.name == currentMonth:
             targetFolder = month
 
-    targetFolder = testFits #temporary for testing
+
 
     #setting fileName to our format
     fileNameChopped = fileName.split('_')
@@ -420,6 +420,8 @@ def importMesh():
     meshBodies = root.meshBodies
     moveFeats = root.features.moveFeatures
 
+    
+
     unitMm = adsk.fusion.MeshUnits.MillimeterMeshUnit
 
     baseFeatures = root.features.baseFeatures
@@ -434,8 +436,9 @@ def importMesh():
 
     baseFeature.finishEdit()
 
+
     meshColl = adsk.core.ObjectCollection.create()
-    meshColl.add(mesh)
+    meshColl.add(meshBodies.item(0))
 
     transform = adsk.core.Matrix3D.create()
     transform.translation = adsk.core.Vector3D.create(0, 8.38, 0)
@@ -443,6 +446,8 @@ def importMesh():
     moveInput = moveFeats.createInput(meshColl, transform)
 
     moveFeats.add(moveInput)
+
+    
 
 def selectFiles(
     msg :str):
@@ -457,5 +462,5 @@ def selectFiles(
         return fileDlg.filenames
 
 
-#importFiles()
+importFiles()
 importMesh()
