@@ -120,6 +120,8 @@ def file_copy(fileName, order, coordinates, normalVectors):
             starterFileFolder = folder
         elif folder.name == "KAFO":
             kafoFolder = folder
+        elif folder.name == "Wireframe Test Fits":
+            testFits = folder
 
     #Grabbing starter files by unique ID. You could also loop through the files and find by name, dont think it matters
     leftStarter = starterFileFolder.dataFiles.itemById("urn:adsk.wipprod:dm.lineage:Axlch_JzSh2eXQugDw6sEg")    
@@ -157,16 +159,16 @@ def file_copy(fileName, order, coordinates, normalVectors):
         if month.name == currentMonth:
             targetFolder = month
 
-    targetFolder = kafoFolder #temporary for testing
+    targetFolder = testFits #temporary for testing
 
     #setting fileName to our format
     fileNameChopped = fileName.split('_')
     fileNameFormatted = fileNameChopped[0] + '_' + fileNameChopped[1] + '_' + fileNameChopped[2] + '_' + fileNameChopped[3]
 
     #This is the actual command that copies the selected doc into the current month folder
-    if travelerStatus != "ARCHIVED":
-        newFile = activeDoc.copy(targetFolder)
-        newFile.name = fileNameFormatted
+    #if travelerStatus != "ARCHIVED":
+    newFile = activeDoc.copy(targetFolder)
+    newFile.name = fileNameFormatted
     return newFile
 
 def importFiles():
@@ -215,11 +217,9 @@ def importFiles():
             # Check to make sure order is open
             if order["status"] == "Open":
                 docData = file_copy(fileName, order, coordinates, normalVectors)
-                
-
                 # File creation was successful. Remove from the list of builder files
-                #app.log(f"Import successful. Removing data for file {fileLabel}")
-                #api.post(f"/api/fusionFile/{file['id']}/delete", {})
+                app.log(f"Import successful. Removing data for file {fileLabel}")
+                api.post(f"/api/fusionFile/{file['id']}/delete", {})
         except:
             app.log(f"Import failed for file {fileLabel}")
         
@@ -407,11 +407,55 @@ def fitFrame(docData, wireframe):
         for i in range(1, 25):
             csMover(i, fitPts[i-1])
 
+        doc.save('Wireframe fit')
+
         # meshBodies = root.meshBodies
         # leg = meshBodies.addByTriangleMeshData(coordinates, [], normalVectors, [])
-            
+
+def importMesh():
+    app = adsk.core.Application.get()
+    ui = app.userInterface
+    design = app.activeProduct
+    root = design.rootComponent
+    meshBodies = root.meshBodies
+    moveFeats = root.features.moveFeatures
+
+    unitMm = adsk.fusion.MeshUnits.MillimeterMeshUnit
+
+    baseFeatures = root.features.baseFeatures
+    baseFeature = baseFeatures.add()
+
+    baseFeature.startEdit()
+
+    paths = selectFiles('Select leg STL')
+
+    for path in paths:
+        mesh = meshBodies.add(path, unitMm, baseFeature)
+
+    baseFeature.finishEdit()
+
+    meshColl = adsk.core.ObjectCollection.create()
+    meshColl.add(mesh)
+
+    transform = adsk.core.Matrix3D.create()
+    transform.translation = adsk.core.Vector3D.create(0, 8.38, 0)
+
+    moveInput = moveFeats.createInput(meshColl, transform)
+
+    moveFeats.add(moveInput)
+
+def selectFiles(
+    msg :str):
+
+    fileDlg = ui.createFileDialog()
+    fileDlg.isMultiSelectEnabled = True
+    fileDlg.title = msg
+    fileDlg.filter = '*.stl'
+    
+    dlgResult = fileDlg.showOpen()
+    if dlgResult == adsk.core.DialogResults.DialogOK:
+        return fileDlg.filenames
 
 
-
-
-importFiles()
+#importFiles()
+importMesh()
