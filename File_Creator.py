@@ -108,7 +108,7 @@ def parseStl(meshData):
 
     return meshName, coordinates, normalVectors
 
-def file_copy(fileName, order, coordinates, normalVectors):
+def file_copy(fileName, order, rigid):
     #This function grabs the proper starter file and creates a copy into the production folder 
 
     productionFolder = app.data.findFolderById('urn:adsk.wipprod:fs.folder:co.EgnkouHiTqeVUlInebHVzg') #Grabbing production folder by unique folder ID
@@ -126,7 +126,12 @@ def file_copy(fileName, order, coordinates, normalVectors):
     #Grabbing starter files by unique ID. You could also loop through the files and find by name, dont think it matters
     leftStarter = starterFileFolder.dataFiles.itemById("urn:adsk.wipprod:dm.lineage:Axlch_JzSh2eXQugDw6sEg")    
     rightStarter = starterFileFolder.dataFiles.itemById("urn:adsk.wipprod:dm.lineage:QZ7I-dyIQ4ayWBotc3zdjw")
-    a3Starter = starterFileFolder.dataFiles.itemById("urn:adsk.wipprod:dm.lineage:YxVWVPAgS-OMBbrvofjM4g")
+
+    for file in starterFileFolder.dataFiles:
+        if file.name == "A3_Rigid_Base_File":
+            a3StarterRigid = file
+        elif file.name == "A3_Base_File":
+            a3Starter = file
 
     #Pulling relevant patient variables from the getOrder function
     orientation    = order["leg"].lower()
@@ -142,13 +147,10 @@ def file_copy(fileName, order, coordinates, normalVectors):
             a3 = False
 
     #Deciding which starter file will be used based on order id input
-    if a3:
-        activeDoc = a3Starter
+    if rigid:
+        activeDoc = a3StarterRigid
     else:
-        if orientation == 'left':
-            activeDoc = leftStarter
-        else:
-            activeDoc = rightStarter
+        activeDoc = a3Starter
 
     #Grabbing the date and current month as a string to match with proper month folder
     today = date.today().strftime("%B %d, %Y")
@@ -171,7 +173,7 @@ def file_copy(fileName, order, coordinates, normalVectors):
     newFile.name = fileNameFormatted
     return newFile
 
-def importFiles():
+def importFiles(rigid):
 
     orderID, cancel = ui.inputBox('Enter Order ID')
     # Get a list of all builder files ready for import
@@ -220,7 +222,7 @@ def importFiles():
             try:
                 # Check to make sure order is open
                 if order["status"] == "Open":
-                    docData = file_copy(fileName, order, coordinates, normalVectors)
+                    docData = file_copy(fileName, order, rigid)
                     # File creation was successful. Remove from the list of builder files
                     app.log(f"Import successful. Removing data for file {fileLabel}")
                     api.post(f"/api/fusionFile/{file['id']}/delete", {})
@@ -465,6 +467,9 @@ def selectFiles(
     if dlgResult == adsk.core.DialogResults.DialogOK:
         return fileDlg.filenames
 
+def execute(rigid=False):
+    importFiles(rigid)
+    importMesh()
 
-importFiles()
-#importMesh()
+rigid = False
+execute(rigid)
