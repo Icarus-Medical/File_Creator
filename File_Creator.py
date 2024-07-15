@@ -172,6 +172,8 @@ def file_copy(fileName, order, coordinates, normalVectors):
     return newFile
 
 def importFiles():
+
+    orderID, cancel = ui.inputBox('Enter Order ID')
     # Get a list of all builder files ready for import
     app.log("Requesting builder files")
     filesResponse = api.get("/api/fusionFile/all")
@@ -182,48 +184,50 @@ def importFiles():
         return
 
     data = filesResponse.data
-
+    
     # Loop through the list of builder files ready for import
     for file in data:
-        fileLabel = f"{file['name']} ({file['id']}"
+        order = file['name'].split('_')[0]
+        if file['name'].split('_')[0] == orderID:
+            fileLabel = f"{file['name']} ({file['id']}"
 
-        # Get the data for a specific builder file
-        app.log(f"Requesting data for file {fileLabel}")
-        fileResponse = api.get(f"/api/fusionFile/{file['id']}")
+            # Get the data for a specific builder file
+            app.log(f"Requesting data for file {fileLabel}")
+            fileResponse = api.get(f"/api/fusionFile/{file['id']}")
 
-        # Make sure the API request was successful
-        if fileResponse.status != 200:
-            app.log(f"Could not get file {fileLabel}). Response: {fileResponse.status} - {fileResponse.reason}")
-            continue
+            # Make sure the API request was successful
+            if fileResponse.status != 200:
+                app.log(f"Could not get file {fileLabel}). Response: {fileResponse.status} - {fileResponse.reason}")
+                continue
 
-        data = fileResponse.data
+            data = fileResponse.data
 
-        # Get the order data for the file
-        order = getOrder(data["order"])
+            # Get the order data for the file
+            order = getOrder(data["order"])
 
-        # Make sure we were able to get order data
-        if order is None:
-            app.log(f"Could not get order data for file {fileLabel}")
-            continue
+            # Make sure we were able to get order data
+            if order is None:
+                app.log(f"Could not get order data for file {fileLabel}")
+                continue
 
-        fileName = data["name"]
-        meshData = data["mesh"]["data"]
-        meshName, coordinates, normalVectors = parseStl(meshData)
-        wireframe = data["wireframe"]
+            fileName = data["name"]
+            meshData = data["mesh"]["data"]
+            meshName, coordinates, normalVectors = parseStl(meshData)
+            wireframe = data["wireframe"]
 
 
-        # Create a new Fusion file
-        try:
-            # Check to make sure order is open
-            if order["status"] == "Open":
-                docData = file_copy(fileName, order, coordinates, normalVectors)
-                # File creation was successful. Remove from the list of builder files
-                app.log(f"Import successful. Removing data for file {fileLabel}")
-                api.post(f"/api/fusionFile/{file['id']}/delete", {})
-        except:
-            app.log(f"Import failed for file {fileLabel}")
-        
-        fitFrame(docData, wireframe)
+            # Create a new Fusion file
+            try:
+                # Check to make sure order is open
+                if order["status"] == "Open":
+                    docData = file_copy(fileName, order, coordinates, normalVectors)
+                    # File creation was successful. Remove from the list of builder files
+                    app.log(f"Import successful. Removing data for file {fileLabel}")
+                    api.post(f"/api/fusionFile/{file['id']}/delete", {})
+            except:
+                app.log(f"Import failed for file {fileLabel}")
+            
+            fitFrame(docData, wireframe)
 
     # product = app.activeProduct
     # root = adsk.fusion.Design.cast(product).rootComponent
@@ -463,4 +467,4 @@ def selectFiles(
 
 
 importFiles()
-importMesh()
+#importMesh()
