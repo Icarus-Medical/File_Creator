@@ -413,6 +413,8 @@ def fitFrame(docData, wireframe):
         for i in range(1, 25):
             csMover(i, fitPts[i-1])
 
+        sk.isLightBulbOn = False
+
         doc.save('Wireframe fit')
 
         # meshBodies = root.meshBodies
