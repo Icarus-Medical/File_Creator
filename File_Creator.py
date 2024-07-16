@@ -161,7 +161,7 @@ def file_copy(fileName, order, rigid):
         if month.name == currentMonth:
             targetFolder = month
 
-
+    #targetFolder = testFits
 
     #setting fileName to our format
     fileNameChopped = fileName.split('_')
@@ -190,9 +190,12 @@ def importFiles(rigid):
     # Loop through the list of builder files ready for import
     for file in data:
         order = file['name'].split('_')[0]
+
         if file['name'].split('_')[0] == orderID:
             fileLabel = f"{file['name']} ({file['id']}"
-
+            
+            #ui.messageBox(str(file['traveler']))
+            
             # Get the data for a specific builder file
             app.log(f"Requesting data for file {fileLabel}")
             fileResponse = api.get(f"/api/fusionFile/{file['id']}")
@@ -356,10 +359,18 @@ def csMover(i, fitPt):
     #find inside point on CS as our fromPt
     csPt = cs.sketchCurves.sketchFittedSplines.item(0).fitPoints.item(1).worldGeometry
 
-    #grab corresponding fitPt from list of nodes
+    cs1Pt = root.sketches.itemByName('CS-1').sketchCurves.sketchFittedSplines.item(0).fitPoints.item(1).worldGeometry
+    cs13Pt = root.sketches.itemByName('CS-13').sketchCurves.sketchFittedSplines.item(0).fitPoints.item(1).worldGeometry
+
+    if 2<= i <= 3 or 23 <= i <= 24:
+        fromPt = cs1Pt
+    elif 11 <= i <= 12 or 14 <= i <= 15:
+        fromPt = cs13Pt
+    else:
+        fromPt = csPt
 
     rawTransform = adsk.core.Matrix3D.create()
-    rawTransform.translation = csPt.vectorTo(fitPt)
+    rawTransform.translation = fromPt.vectorTo(fitPt)
 
     dX = rawTransform.translation.x
     dY = rawTransform.translation.y
@@ -410,7 +421,19 @@ def fitFrame(docData, wireframe):
             sk.sketchPoints.add(pt)
             fitPts.append(pt)
 
-        for i in range(1, 25):
+        leftHinge = [2,3,23,24,1]
+        rightHinge = [11,12,14,15,13]
+
+
+        for n in leftHinge:
+            csMover(n, fitPts[n-1])
+
+        for x in rightHinge:
+            csMover(x, fitPts[x-1])
+
+        for i in range(4, 11):
+            csMover(i, fitPts[i-1])
+        for i in range(16, 23):
             csMover(i, fitPts[i-1])
 
         sk.isLightBulbOn = False
