@@ -108,7 +108,7 @@ def parseStl(meshData):
 
     return meshName, coordinates, normalVectors
 
-def file_copy(fileName, order, rigid):
+def file_copy(fileName, rigid):
     #This function grabs the proper starter file and creates a copy into the production folder 
 
     productionFolder = app.data.findFolderById('urn:adsk.wipprod:fs.folder:co.EgnkouHiTqeVUlInebHVzg') #Grabbing production folder by unique folder ID
@@ -123,9 +123,6 @@ def file_copy(fileName, order, rigid):
         elif folder.name == "Wireframe Test Fits":
             testFits = folder
 
-    #Grabbing starter files by unique ID. You could also loop through the files and find by name, dont think it matters
-    leftStarter = starterFileFolder.dataFiles.itemById("urn:adsk.wipprod:dm.lineage:Axlch_JzSh2eXQugDw6sEg")    
-    rightStarter = starterFileFolder.dataFiles.itemById("urn:adsk.wipprod:dm.lineage:QZ7I-dyIQ4ayWBotc3zdjw")
 
     for file in starterFileFolder.dataFiles:
         if file.name == "A3_Rigid_Base_File":
@@ -133,18 +130,6 @@ def file_copy(fileName, order, rigid):
         elif file.name == "A3_Base_File":
             a3Starter = file
 
-    #Pulling relevant patient variables from the getOrder function
-    orientation    = order["leg"].lower()
-    model          = order["catalog"] #this tells me if its Ascender, KAFO or A3.0
-    step           = order["lastJobEvent"] #if None, traveler is not started
-    travelerStatus = order["travelerStatus"]
-
-    if model == 'Ascender - Custom' or model == 'Ascender 3 - Custom':
-        #Checking if the model is an ascender 3. If '3' is present as the 2nd word
-        if model.split()[1] == "3":
-            a3 = True
-        else:
-            a3 = False
 
     #Deciding which starter file will be used based on order id input
     if rigid:
@@ -173,7 +158,7 @@ def file_copy(fileName, order, rigid):
     newFile.name = fileNameFormatted
     return newFile
 
-def importFiles(rigid):
+def importFiles():
 
     orderID, cancel = ui.inputBox('Enter Order ID')
     # Get a list of all builder files ready for import
@@ -189,44 +174,47 @@ def importFiles(rigid):
     
     # Loop through the list of builder files ready for import
     for file in data:
-        order = file['name'].split('_')[0]
+        #order = file['name'].split('_')[0]
 
-        if file['name'].split('_')[0] == orderID:
-            fileLabel = f"{file['name']} ({file['id']}"
-            
-            #ui.messageBox(str(file['traveler']))
-            
-            # Get the data for a specific builder file
-            app.log(f"Requesting data for file {fileLabel}")
-            fileResponse = api.get(f"/api/fusionFile/{file['id']}")
+        #if file['name'].split('_')[0] == orderID:
+        fileLabel = f"{file['name']} ({file['id']}"
+        
+        #ui.messageBox(str(file['traveler']))
+        
+        # Get the data for a specific builder file
+        app.log(f"Requesting data for file {fileLabel}")
+        fileResponse = api.get(f"/api/fusionFile/{file['id']}")
 
-            # Make sure the API request was successful
-            if fileResponse.status != 200:
-                app.log(f"Could not get file {fileLabel}). Response: {fileResponse.status} - {fileResponse.reason}")
-                continue
+        # Make sure the API request was successful
+        if fileResponse.status != 200:
+            app.log(f"Could not get file {fileLabel}). Response: {fileResponse.status} - {fileResponse.reason}")
+            continue
 
-            data = fileResponse.data
+        data = fileResponse.data
 
-            # Get the order data for the file
-            order = getOrder(data["order"])
+        # Get the order data for the file
+        order = getOrder(data["order"])
 
-            # Make sure we were able to get order data
-            if order is None:
-                app.log(f"Could not get order data for file {fileLabel}")
-                continue
+        # Make sure we were able to get order data
+        if order is None:
+            app.log(f"Could not get order data for file {fileLabel}")
+            continue
 
-            fileName = data["name"]
-            meshData = data["mesh"]["data"]
-            meshName, coordinates, normalVectors = parseStl(meshData)
-            wireframe = data["wireframe"]
-            order2   = data['order']['id']
+        fileName = data["name"]
+        meshData = data["mesh"]["data"]
+        meshName, coordinates, normalVectors = parseStl(meshData)
+        wireframe = data["wireframe"]
+        traveler_orderID   = data['order']['id']
+        rigid = data['order']['hasRigidFrame']
+        #ui.messageBox(str(order))
 
 
+        if str(traveler_orderID) == orderID:
             # Create a new Fusion file
             try:
                 # Check to make sure order is open
                 if order["status"] == "Open":
-                    docData = file_copy(fileName, order, rigid)
+                    docData = file_copy(fileName, rigid)
                     # File creation was successful. Remove from the list of builder files
                     app.log(f"Import successful. Removing data for file {fileLabel}")
                     api.post(f"/api/fusionFile/{file['id']}/delete", {})
@@ -493,9 +481,9 @@ def selectFiles(
     if dlgResult == adsk.core.DialogResults.DialogOK:
         return fileDlg.filenames
 
-def execute(rigid=False):
-    importFiles(rigid)
+def execute():
+    importFiles()
     importMesh()
 
-rigid = False
-execute(rigid)
+
+execute()
