@@ -219,6 +219,7 @@ def importFiles(rigid):
             meshData = data["mesh"]["data"]
             meshName, coordinates, normalVectors = parseStl(meshData)
             wireframe = data["wireframe"]
+            order2   = data['order']['id']
 
 
             # Create a new Fusion file
