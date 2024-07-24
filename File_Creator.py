@@ -398,6 +398,25 @@ def csMover(i, fitPts):
     elif i == 14 or i == 24:
         ip_mover(i, transform, True)
 
+def shorten_frame(zShift):
+    app = adsk.core.Application.get()
+    ui = app.userInterface
+    design = app.activeProduct
+    root = design.rootComponent
+
+    #add cross section curve and points to group and move together
+    group = adsk.core.ObjectCollection.create()
+
+    sk = root.sketches.itemByName('Strap pos')
+
+    for line in sk.sketchCurves.sketchLines:
+        if line.startSketchPoint.worldGeometry.z > 11:
+            group.add(line)
+
+    transform = adsk.core.Matrix3D.create()
+    transform.translation = adsk.core.Vector3D.create(0,zShift,0)
+
+    sk.move(group, transform)
     
 
 def fitFrame(docData, wireframe):
@@ -414,6 +433,12 @@ def fitFrame(docData, wireframe):
             pt = adsk.core.Point3D.create(node[0]/10,(node[2]/10) + 8.38,node[1]/10)
             sk.sketchPoints.add(pt)
             fitPts.append(pt)
+
+        if fitPts[9].z < 10.668:
+            shorten = True
+            zShift = fitPts[9].z - 10.668
+            shorten_frame(zShift)
+
 
         leftHinge = [2,3,23,24,1]
         rightHinge = [11,12,14,15,13]
