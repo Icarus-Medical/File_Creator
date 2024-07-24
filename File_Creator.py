@@ -174,12 +174,7 @@ def importFiles():
     
     # Loop through the list of builder files ready for import
     for file in data:
-        #order = file['name'].split('_')[0]
-
-        #if file['name'].split('_')[0] == orderID:
         fileLabel = f"{file['name']} ({file['id']}"
-        
-        #ui.messageBox(str(file['traveler']))
         
         # Get the data for a specific builder file
         app.log(f"Requesting data for file {fileLabel}")
@@ -206,8 +201,6 @@ def importFiles():
         wireframe = data["wireframe"]
         traveler_orderID   = data['order']['id']
         rigid = data['order']['hasRigidFrame']
-        #ui.messageBox(str(order))
-
 
         if str(traveler_orderID) == orderID:
             # Create a new Fusion file
@@ -223,8 +216,7 @@ def importFiles():
             
             fitFrame(docData, wireframe)
 
-    # product = app.activeProduct
-    # root = adsk.fusion.Design.cast(product).rootComponent
+
 def pointCreator(wireframe):
         nodes = []
         #I'm naming these based on the cross sections they match up with. fitPt1 = CS-1 etc
@@ -329,7 +321,7 @@ def hinge_mover(transform, medial=False):
     moveFeatureInput = moveFeats.createInput(bodies, transform)
     moveFeats.add(moveFeatureInput)   
 
-def csMover(i, fitPt):
+def csMover(i, fitPts):
     app = adsk.core.Application.get()
     ui = app.userInterface
     design = app.activeProduct
@@ -350,6 +342,11 @@ def csMover(i, fitPt):
 
     cs1Pt = root.sketches.itemByName('CS-1').sketchCurves.sketchFittedSplines.item(0).fitPoints.item(1).worldGeometry
     cs13Pt = root.sketches.itemByName('CS-13').sketchCurves.sketchFittedSplines.item(0).fitPoints.item(1).worldGeometry
+    cs10Pt = root.sketches.itemByName('CS-10').sketchCurves.sketchFittedSplines.item(0).fitPoints.item(1).worldGeometry
+
+    fitPt = fitPts[i-1]
+    fitPt10 = fitPts[9]
+
 
     if 2<= i <= 3 or 23 <= i <= 24:
         fromPt = cs1Pt
@@ -365,6 +362,9 @@ def csMover(i, fitPt):
     dY = rawTransform.translation.y
     dZ = rawTransform.translation.z
 
+    vector10 = cs10Pt.vectorTo(fitPt10)
+    zShift = vector10.z
+
     #specific translation modifiers for cs's
     transform = adsk.core.Matrix3D.create()
 
@@ -376,7 +376,12 @@ def csMover(i, fitPt):
         a = 0
 
     #isolating cuff cross sections to move in X and Y directions
-    if 6 <= i <= 8 or 18 <= i <= 20:                                                                                  #BCuff corners flare out
+    if 4 <= i <= 10:
+        if 6 <= i <= 8:
+            transform.translation = adsk.core.Vector3D.create(dX, dY, zShift)
+        else:
+            transform.translation = adsk.core.Vector3D.create(dX, 0, zShift) 
+    elif 18 <= i <= 20:                                                                                  #BCuff corners flare out
         transform.translation = adsk.core.Vector3D.create(dX, dY, 0)
     else:
         transform.translation = adsk.core.Vector3D.create(dX+a, 0, 0)
@@ -415,15 +420,15 @@ def fitFrame(docData, wireframe):
 
 
         for n in leftHinge:
-            csMover(n, fitPts[n-1])
+            csMover(n, fitPts)
 
         for x in rightHinge:
-            csMover(x, fitPts[x-1])
+            csMover(x, fitPts)
 
         for i in range(4, 11):
-            csMover(i, fitPts[i-1])
+            csMover(i, fitPts)
         for i in range(16, 23):
-            csMover(i, fitPts[i-1])
+            csMover(i, fitPts)
 
         sk.isLightBulbOn = False
 
