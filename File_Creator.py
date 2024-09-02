@@ -149,13 +149,13 @@ def file_copy(fileName, rigid, model):
         kafo = True
 
     if kafo:
-        if fileName.split[3] == "TAD":
+        if fileName.split('_')[3] == "TAD":
             activeDoc = tadStarter
-        if fileName.split[3] == "TAP":
+        if fileName.split('_')[3] == "TAP":
             activeDoc = tapStarter
-        if fileName.split[3] == "TPD":
+        if fileName.split('_')[3] == "TPD":
             activeDoc = tpdStarter
-        if fileName.split[3] == "TPP":
+        if fileName.split('_')[3] == "TPP":
             activeDoc = tppStarter
 
         targetFolder = kafoPatients
@@ -181,7 +181,7 @@ def file_copy(fileName, rigid, model):
     #setting fileName to our format
     fileNameChopped = fileName.split('_')
     if kafo:
-        fileNameFormatted = fileNameChopped[0] + '_' + fileNameChopped[1] + '_' + fileNameChopped[2] + '_' + fileNameChopped[3] + fileNameChopped[4]
+        fileNameFormatted = fileNameChopped[0] + '_' + fileNameChopped[1] + '_' + fileNameChopped[2] + '_' + fileNameChopped[3] + '_' + fileNameChopped[4]
     else:
          fileNameFormatted = fileNameChopped[0] + '_' + fileNameChopped[1] + '_' + fileNameChopped[2] + '_' + fileNameChopped[3]
 
@@ -234,7 +234,9 @@ def importFiles():
         wireframe = data["wireframe"]
         traveler_orderID   = data['order']['id']
         rigid = data['order']['hasRigidFrame']
-        model = data['order']['catalog']
+        model = data['order']['catalog']['name']
+
+        
 
         if str(traveler_orderID) == orderID:
             # Create a new Fusion file
@@ -247,8 +249,12 @@ def importFiles():
                     api.post(f"/api/fusionFile/{file['id']}/delete", {})
             except:
                 app.log(f"Import failed for file {fileLabel}")
+
+            #docData = file_copy(fileName, rigid, model)
             
-        if model != "KAFO - Custom":
+        if model == "KAFO - Custom":
+            kafoCreate(docData)
+        else:
             fitFrame(docData, wireframe)
 
 
@@ -453,6 +459,12 @@ def shorten_frame(zShift):
 
     sk.move(group, transform)
     
+def kafoCreate(docData):
+        doc = app.documents.open(docData, False)
+        des: adsk.fusion.Design = doc.products.itemByProductType('DesignProductType')
+        root = des.rootComponent
+
+        doc.save('Wireframe fit')
 
 def fitFrame(docData, wireframe):
         doc = app.documents.open(docData, False)
