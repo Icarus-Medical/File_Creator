@@ -108,7 +108,7 @@ def parseStl(meshData):
 
     return meshName, coordinates, normalVectors
 
-def file_copy(fileName, rigid):
+def file_copy(fileName, rigid, model):
     #This function grabs the proper starter file and creates a copy into the production folder 
 
     productionFolder = app.data.findFolderById('urn:adsk.wipprod:fs.folder:co.EgnkouHiTqeVUlInebHVzg') #Grabbing production folder by unique folder ID
@@ -123,34 +123,67 @@ def file_copy(fileName, rigid):
         elif folder.name == "Wireframe Test Fits":
             testFits = folder
 
-
     for file in starterFileFolder.dataFiles:
         if file.name == "A3_Rigid_Base_File":
             a3StarterRigid = file
         elif file.name == "A3_Base_File":
             a3Starter = file
 
+    for folder in kafoFolder.dataFolders:
+        if folder.name == "KAFO Starter Files":
+            kafoStarters = folder
+        if folder.name == "2024 KAFO Patient Files":
+            kafoPatients = folder
 
-    #Deciding which starter file will be used based on order id input
-    if rigid:
-        activeDoc = a3StarterRigid
+    for file in kafoStarters.dataFiles:
+        if file.name == "A2_TAP_Starter_File":
+            tapStarter = file
+        elif file.name == "A2_TAD_Starter_File":
+            tadStarter = file
+        elif file.name == "A2_TPD_Starter_File":
+            tpdStarter = file
+        elif file.name == "A2_TPP_Starter_File":
+            tppStarter = file
+            
+    if model == "KAFO - Custom":
+        kafo = True
+
+    if kafo:
+        if fileName.split[3] == "TAD":
+            activeDoc = tadStarter
+        if fileName.split[3] == "TAP":
+            activeDoc = tapStarter
+        if fileName.split[3] == "TPD":
+            activeDoc = tpdStarter
+        if fileName.split[3] == "TPP":
+            activeDoc = tppStarter
+
+        targetFolder = kafoPatients
+
     else:
-        activeDoc = a3Starter
+    #Deciding which starter file will be used based on order id input
+        if rigid:
+            activeDoc = a3StarterRigid
+        else:
+            activeDoc = a3Starter
 
-    #Grabbing the date and current month as a string to match with proper month folder
-    today = date.today().strftime("%B %d, %Y")
-    currentMonth = today.split()[0]
+        #Grabbing the date and current month as a string to match with proper month folder
+        today = date.today().strftime("%B %d, %Y")
+        currentMonth = today.split()[0]
 
-    #going inside patient files and finding folder that matches the current month 
-    for month in patientFilesFolder.dataFolders:
-        if month.name == currentMonth:
-            targetFolder = month
+        #going inside patient files and finding folder that matches the current month 
+        for month in patientFilesFolder.dataFolders:
+            if month.name == currentMonth:
+                targetFolder = month
 
     #targetFolder = testFits
 
     #setting fileName to our format
     fileNameChopped = fileName.split('_')
-    fileNameFormatted = fileNameChopped[0] + '_' + fileNameChopped[1] + '_' + fileNameChopped[2] + '_' + fileNameChopped[3]
+    if kafo:
+        fileNameFormatted = fileNameChopped[0] + '_' + fileNameChopped[1] + '_' + fileNameChopped[2] + '_' + fileNameChopped[3] + fileNameChopped[4]
+    else:
+         fileNameFormatted = fileNameChopped[0] + '_' + fileNameChopped[1] + '_' + fileNameChopped[2] + '_' + fileNameChopped[3]
 
     #This is the actual command that copies the selected doc into the current month folder
     #if travelerStatus != "ARCHIVED":
@@ -201,19 +234,21 @@ def importFiles():
         wireframe = data["wireframe"]
         traveler_orderID   = data['order']['id']
         rigid = data['order']['hasRigidFrame']
+        model = data['order']['catalog']
 
         if str(traveler_orderID) == orderID:
             # Create a new Fusion file
             try:
                 # Check to make sure order is open
                 if order["status"] == "Open":
-                    docData = file_copy(fileName, rigid)
+                    docData = file_copy(fileName, rigid, model)
                     # File creation was successful. Remove from the list of builder files
                     app.log(f"Import successful. Removing data for file {fileLabel}")
                     api.post(f"/api/fusionFile/{file['id']}/delete", {})
             except:
                 app.log(f"Import failed for file {fileLabel}")
             
+        if model != "KAFO - Custom":
             fitFrame(docData, wireframe)
 
 
