@@ -147,6 +147,8 @@ def file_copy(fileName, rigid, model):
             
     if model == "KAFO - Custom":
         kafo = True
+    else:
+        kafo = False
 
     if kafo:
         if fileName.split('_')[3] == "TAD":
@@ -228,17 +230,16 @@ def importFiles():
             app.log(f"Could not get order data for file {fileLabel}")
             continue
 
-        fileName = data["name"]
-        meshData = data["mesh"]["data"]
-        meshName, coordinates, normalVectors = parseStl(meshData)
-        wireframe = data["wireframe"]
         traveler_orderID   = data['order']['id']
-        rigid = data['order']['hasRigidFrame']
-        model = data['order']['catalog']['name']
-
-        
 
         if str(traveler_orderID) == orderID:
+            fileName = data["name"]
+            meshData = data["mesh"]["data"]
+            meshName, coordinates, normalVectors = parseStl(meshData)
+            rigid = data['order']['hasRigidFrame']
+            model = data['order']['catalog']['name']
+            wireframe = data["wireframe"]
+            model = data['order']['catalog']['name']
             # Create a new Fusion file
             try:
                 # Check to make sure order is open
@@ -249,13 +250,15 @@ def importFiles():
                     api.post(f"/api/fusionFile/{file['id']}/delete", {})
             except:
                 app.log(f"Import failed for file {fileLabel}")
-
+            #ui.messageBox(model)
             #docData = file_copy(fileName, rigid, model)
             
-        if model == "KAFO - Custom":
-            kafoCreate(docData)
-        else:
-            fitFrame(docData, wireframe)
+            if model == "KAFO - Custom":
+                kafo = True
+            else:
+                kafo = False
+
+            fitFrame(docData, wireframe, kafo)
 
 
 def pointCreator(wireframe):
@@ -459,50 +462,51 @@ def shorten_frame(zShift):
 
     sk.move(group, transform)
     
-def kafoCreate(docData):
+# def kafoCreate(docData):
+#         doc = app.documents.open(docData, False)
+#         des: adsk.fusion.Design = doc.products.itemByProductType('DesignProductType')
+#         root = des.rootComponent
+
+#         doc.save('Wireframe fit')
+
+def fitFrame(docData, wireframe, kafo):
         doc = app.documents.open(docData, False)
         des: adsk.fusion.Design = doc.products.itemByProductType('DesignProductType')
         root = des.rootComponent
 
-        doc.save('Wireframe fit')
+        if not kafo:
+            nodes = pointCreator(wireframe)
 
-def fitFrame(docData, wireframe):
-        doc = app.documents.open(docData, False)
-        des: adsk.fusion.Design = doc.products.itemByProductType('DesignProductType')
-        root = des.rootComponent
+            sk = root.sketches.add(root.xYConstructionPlane)
 
-        nodes = pointCreator(wireframe)
+            fitPts = []
+            for node in nodes:
+                pt = adsk.core.Point3D.create(node[0]/10,(node[2]/10) + 8.38,node[1]/10)
+                sk.sketchPoints.add(pt)
+                fitPts.append(pt)
 
-        sk = root.sketches.add(root.xYConstructionPlane)
-
-        fitPts = []
-        for node in nodes:
-            pt = adsk.core.Point3D.create(node[0]/10,(node[2]/10) + 8.38,node[1]/10)
-            sk.sketchPoints.add(pt)
-            fitPts.append(pt)
-
-        if fitPts[9].z < 10.668:
-            shorten = True
-            zShift = fitPts[9].z - 10.668
-            shorten_frame(zShift)
+            if fitPts[9].z < 10.668:
+                shorten = True
+                zShift = fitPts[9].z - 10.668
+                shorten_frame(zShift)
 
 
-        leftHinge = [2,3,23,24,1]
-        rightHinge = [11,12,14,15,13]
+            leftHinge = [2,3,23,24,1]
+            rightHinge = [11,12,14,15,13]
 
 
-        for n in leftHinge:
-            csMover(n, fitPts)
+            for n in leftHinge:
+                csMover(n, fitPts)
 
-        for x in rightHinge:
-            csMover(x, fitPts)
+            for x in rightHinge:
+                csMover(x, fitPts)
 
-        for i in range(4, 11):
-            csMover(i, fitPts)
-        for i in range(16, 23):
-            csMover(i, fitPts)
+            for i in range(4, 11):
+                csMover(i, fitPts)
+            for i in range(16, 23):
+                csMover(i, fitPts)
 
-        sk.isLightBulbOn = False
+            sk.isLightBulbOn = False
 
         doc.save('Wireframe fit')
 
@@ -564,3 +568,4 @@ def execute():
 
 
 execute()
+#importMesh()
