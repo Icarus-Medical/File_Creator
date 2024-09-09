@@ -3,6 +3,7 @@
 import adsk.core, adsk.fusion, traceback, requests, math, sys
 from . import Api
 from datetime import date
+import os
 
 app = adsk.core.Application.get()
 ui  = app.userInterface
@@ -195,7 +196,7 @@ def file_copy(fileName, rigid, model):
 
 def importFiles():
 
-    orderID, cancel = ui.inputBox('Enter Order ID')
+    #orderID, cancel = ui.inputBox('Enter Order ID')
     # Get a list of all builder files ready for import
     app.log("Requesting builder files")
     filesResponse = api.get("/api/fusionFile/all")
@@ -232,33 +233,36 @@ def importFiles():
 
         traveler_orderID   = data['order']['id']
 
-        if str(traveler_orderID) == orderID:
-            fileName = data["name"]
-            meshData = data["mesh"]["data"]
-            meshName, coordinates, normalVectors = parseStl(meshData)
-            rigid = data['order']['hasRigidFrame']
-            model = data['order']['catalog']['name']
-            wireframe = data["wireframe"]
-            model = data['order']['catalog']['name']
-            # Create a new Fusion file
-            try:
-                # Check to make sure order is open
-                if order["status"] == "Open":
-                    docData = file_copy(fileName, rigid, model)
-                    # File creation was successful. Remove from the list of builder files
-                    app.log(f"Import successful. Removing data for file {fileLabel}")
-                    api.post(f"/api/fusionFile/{file['id']}/delete", {})
-            except:
-                app.log(f"Import failed for file {fileLabel}")
+        #if str(traveler_orderID) == orderID:
+        fileName = data["name"]
+        meshData = data["mesh"]["data"]
+        meshName, coordinates, normalVectors = parseStl(meshData)
+        rigid = data['order']['hasRigidFrame']
+        model = data['order']['catalog']['name']
+        wireframe = data["wireframe"]
+        model = data['order']['catalog']['name']
+        # Create a new Fusion file
+        try:
+            # Check to make sure order is open
+            if order["status"] == "Open":
+                docData = file_copy(fileName, rigid, model)
+                # File creation was successful. Remove from the list of builder files
+                app.log(f"Import successful. Removing data for file {fileLabel}")
+                api.post(f"/api/fusionFile/{file['id']}/delete", {})
+        except:
+            app.log(f"Import failed for file {fileLabel}")
             #ui.messageBox(model)
             #docData = file_copy(fileName, rigid, model)
             
-            if model == "KAFO - Custom":
-                kafo = True
-            else:
-                kafo = False
+        if model == "KAFO - Custom":
+            kafo = True
+        else:
+            kafo = False
 
-            fitFrame(docData, wireframe, kafo)
+
+        fitFrame(docData, wireframe, kafo, fileName)
+
+    return fileName
 
 
 def pointCreator(wireframe):
@@ -469,10 +473,12 @@ def shorten_frame(zShift):
 
 #         doc.save('Wireframe fit')
 
-def fitFrame(docData, wireframe, kafo):
+def fitFrame(docData, wireframe, kafo,fileName):
         doc = app.documents.open(docData, False)
         des: adsk.fusion.Design = doc.products.itemByProductType('DesignProductType')
         root = des.rootComponent
+
+        importMesh(fileName)
 
         if not kafo:
             nodes = pointCreator(wireframe)
@@ -513,7 +519,7 @@ def fitFrame(docData, wireframe, kafo):
         # meshBodies = root.meshBodies
         # leg = meshBodies.addByTriangleMeshData(coordinates, [], normalVectors, [])
 
-def importMesh():
+def importMesh(fileName):
     app = adsk.core.Application.get()
     ui = app.userInterface
     design = app.activeProduct
@@ -521,7 +527,7 @@ def importMesh():
     meshBodies = root.meshBodies
     moveFeats = root.features.moveFeatures
 
-    
+    #meshName, coordinates, normalVectors = parseStl(meshData)
 
     unitMm = adsk.fusion.MeshUnits.MillimeterMeshUnit
 
@@ -530,13 +536,24 @@ def importMesh():
 
     baseFeature.startEdit()
 
-    paths = selectFiles('Select leg STL')
+    #mesh = meshBodies.addByTriangleMeshData(coordinates, [], normalVectors, [])
 
-    for path in paths:
-        mesh = meshBodies.add(path, unitMm, baseFeature)
+    user = os.path.expanduser('~')
+    #ui.messageBox(str(user))
+
+    path = user + '\Downloads' + '\\' + fileName + '.stl'
+    #this returns the path below on my computer, gotta make sure it works for others.
+    #C:\Users\scire\Downloads\15422_tbd__CPD_R_1.0x.stl
+    #ui.messageBox(str(path))
+
+    #ADD TRY EXCEPT TO SELECT LEG IN CASE IMPORT IS OFF
+    #paths = selectFiles('Select leg STL')
+    #for path in paths:
+    mesh = meshBodies.add(path, unitMm, baseFeature)
 
     baseFeature.finishEdit()
 
+    #ui.messageBox(str(path))
 
     meshColl = adsk.core.ObjectCollection.create()
     meshColl.add(meshBodies.item(0))
@@ -562,10 +579,10 @@ def selectFiles(
     if dlgResult == adsk.core.DialogResults.DialogOK:
         return fileDlg.filenames
 
-def execute():
-    importFiles()
-    importMesh()
+
+importFiles()
 
 
-execute()
+
+
 #importMesh()
