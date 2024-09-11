@@ -275,7 +275,7 @@ def pointCreator(wireframe):
         fitPt22 = wireframe['botLeftFramePos']
         fitPt21 = wireframe['botLeftPos']
         fitPt18 = wireframe['botRightCuffPos']
-        fitPt16 = wireframe['botRightFamePos']
+        fitPt16 = wireframe['botRightFramePos']
         fitPt17 = wireframe['botRightPos']
         fitPt7 = wireframe['topCuffPos']
         fitPt6 = wireframe['topLeftCuffPos']
@@ -537,19 +537,16 @@ def importMesh(fileName):
     baseFeature.startEdit()
 
     #mesh = meshBodies.addByTriangleMeshData(coordinates, [], normalVectors, [])
-
-    user = os.path.expanduser('~')
+    try:
+        user = os.path.expanduser('~')
     #ui.messageBox(str(user))
-
-    path = user + '\Downloads' + '\\' + fileName + '.stl'
-    #this returns the path below on my computer, gotta make sure it works for others.
-    #C:\Users\scire\Downloads\15422_tbd__CPD_R_1.0x.stl
-    #ui.messageBox(str(path))
-
+        path = user + '\Downloads' + '\\' + fileName + '.stl'
+        mesh = meshBodies.add(path, unitMm, baseFeature)
+    except:
     #ADD TRY EXCEPT TO SELECT LEG IN CASE IMPORT IS OFF
-    #paths = selectFiles('Select leg STL')
-    #for path in paths:
-    mesh = meshBodies.add(path, unitMm, baseFeature)
+        paths = selectFiles('Select leg STL')
+        for path in paths:
+            mesh = meshBodies.add(path, unitMm, baseFeature)
 
     baseFeature.finishEdit()
 
