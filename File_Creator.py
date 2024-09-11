@@ -271,7 +271,7 @@ def pointCreator(wireframe):
         fitPt22 = wireframe['botLeftFramePos']
         fitPt21 = wireframe['botLeftPos']
         fitPt18 = wireframe['botRightCuffPos']
-        fitPt16 = wireframe['botRightFamePos']
+        fitPt16 = wireframe['botRightFramePos']
         fitPt17 = wireframe['botRightPos']
         fitPt7 = wireframe['topCuffPos']
         fitPt6 = wireframe['topLeftCuffPos']
