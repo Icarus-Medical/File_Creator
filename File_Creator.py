@@ -392,6 +392,7 @@ def csMover(i, fitPts):
     fitPt10 = fitPts[9]
 
 
+
     if 2<= i <= 3 or 23 <= i <= 24:
         fromPt = cs1Pt
     elif 11 <= i <= 12 or 14 <= i <= 15:
